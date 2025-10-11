@@ -109,7 +109,6 @@ for number in numbers:
     number_text = font.render(number, True, black)
     number_surface.blit(number_text, (0, 400 - (index * 50) - 25))
 
-
 for letter in letters:
     index = letters.index(letter)
     letter_text = font.render(letter, True, black)
@@ -166,7 +165,8 @@ for piece in black_pieces:
         piece.image = pygame.image.load('assets/bK.png')
         piece.image = pygame.transform.scale(piece.image, (50, 50))
         black_pieces_images.append(piece.image)
-    
+
+
 
 def display_board():
     square_size = 400 // board_size
