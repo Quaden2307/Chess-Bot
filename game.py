@@ -1,12 +1,10 @@
 import chess
 import pygame
-from gui import Piece 
-from gui import white_pieces, black_pieces, draw_pieces, chessscreen, board_size, beige, brown
 
+pygame.init()
 
 chessboard = chess.Board()
-x_index = None
-y_index = None
+
 
 def get_mouse_position():
     mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -18,15 +16,17 @@ def get_mouse_position():
         return mouse_x, mouse_y
 
 def get_starting_piece_position(mouse_x, mouse_y, x_index, y_index, chessboard):
+    if mouse_x is None or mouse_y is None:
+        return None, None, None, None
     x_index = mouse_x // 50
     y_index = 7 - (mouse_y // 50)  # Invert y-axis for chess board coordinates
     start_square = chess.square(x_index, y_index)
     selected_piece = chessboard.piece_at(chess.square(x_index, y_index))
     return x_index, y_index, start_square, selected_piece
+  
 
 
-def move_piece(start_square):
-    end_x, end_y = get_mouse_position()
+def move_piece(start_square, end_x, end_y):
     
     if end_x is None or end_y is None:
         return False
@@ -37,26 +37,10 @@ def move_piece(start_square):
 
     if move in chessboard.legal_moves:
         chessboard.push(move)
-        return True
+        return end_square 
     return False
 
 
-
-while not chessboard.is_game_over():
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            exit()
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            if x_index is None and y_index is None:
-            
-                mouse_x, mouse_y = get_mouse_position()
-                x_index, y_index, start_square, selected_piece = get_starting_piece_position(mouse_x, mouse_y, x_index, y_index, chessboard)
-
-            elif x_index is not None and y_index is not None:
-                if move_piece(start_square):
-                    x_index = None
-                    y_index = None
 
         
 
