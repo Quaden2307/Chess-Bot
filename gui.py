@@ -34,6 +34,7 @@ class Piece:
         self.id = id
         self.image = None
         self.id = id
+        self.has_moved = False
     
     def draw(self, surface):
         current_color = self.color
@@ -195,7 +196,7 @@ def clear_square(x, y):
     rect = pygame.Rect(x * square_size, (7 - y) * square_size, square_size, square_size)
     pygame.draw.rect(chessscreen, color, rect)
 
-def update_drawing_piece(start_square, end_square):
+def update_drawing_piece(start_square, end_square, chessboard):
     start_sqaure_x = chess.square_file(start_square)
     start_square_y = chess.square_rank(start_square)
     end_square_x = chess.square_file(end_square)
@@ -217,16 +218,129 @@ def update_drawing_piece(start_square, end_square):
             else:
                 black_pieces.remove(captured_piece)
             
+        if piece.name == "Pawn" and (end_square_y == 0 or end_square_y == 7):
+            piece.name = "Queen"
+            if piece.color == "White":
+                piece.image = pygame.image.load('assets/wQ.png')
+            elif piece.color == "Black":
+                piece.image = pygame.image.load('assets/bQ.png')
 
+            piece.image = pygame.transform.scale(piece.image, (50, 50))
+        
+        #White Castling
+        if (
+            piece.name == "King"
+            and not piece.has_moved
+            and piece.color == "White"
+            and end_square_y == 0
+        ):
+            # Kingside castling
+            if end_square_x == 6 and not board[0][7].has_moved:
+                rook_piece = board[0][7]
+                if rook_piece:
+                    board[0][5] = rook_piece
+                    board[0][7] = None
+                    rook_piece.x_position_index = 5
+                    rook_piece.y_position_index = 0
+                    rook_piece.has_moved = True
+                    clear_square(7, 0)
+                    x_pix = 5 * 50
+                    y_pix = (7 - 0) * 50
+                    chessscreen.blit(rook_piece.image, (x_pix, y_pix))
+            # Queenside castling
+            elif end_square_x == 2 and not board[0][0].has_moved:
+                rook_piece = board[0][0]
+                if rook_piece:
+                    board[0][3] = rook_piece
+                    board[0][0] = None
+                    rook_piece.x_position_index = 3
+                    rook_piece.y_position_index = 0
+                    rook_piece.has_moved = True
+                    clear_square(0, 0)
+                    x_pix = 3 * 50
+                    y_pix = (7 - 0) * 50
+                    chessscreen.blit(rook_piece.image, (x_pix, y_pix))
+
+        #Black Castling
+        if (
+            piece.name == "King"
+            and not piece.has_moved
+            and piece.color == "Black"
+            and end_square_y == 7
+        ):
+            # Kingside (black)
+            if end_square_x == 6 and not board[7][7].has_moved:
+                rook_piece = board[7][7]
+                if rook_piece:
+                    board[7][5] = rook_piece
+                    board[7][7] = None
+                    clear_square(7, 7)
+
+                    rook_piece.x_position_index = 5
+                    rook_piece.y_position_index = 7
+                    rook_piece.has_moved = True
+
+                    x_pix = 5 * 50
+                    y_pix = (7 - 7) * 50
+                    chessscreen.blit(rook_piece.image, (x_pix, y_pix))
+
+            # Queenside (black)
+            elif end_square_x == 2 and not board[7][0].has_moved:
+                rook_piece = board[7][0]
+                if rook_piece:
+                    board[7][3] = rook_piece
+                    board[7][0] = None
+                    clear_square(0, 7)
+
+                    rook_piece.x_position_index = 3
+                    rook_piece.y_position_index = 7
+                    rook_piece.has_moved = True
+
+                    x_pix = 3 * 50
+                    y_pix = (7 - 7) * 50
+                    chessscreen.blit(rook_piece.image, (x_pix, y_pix))
+
+        
+        
+                
         board[end_square_y][end_square_x] = piece
         board[start_square_y][start_sqaure_x] = None
 
         piece.x_position_index = end_square_x
         piece.y_position_index = end_square_y
 
+        piece.has_moved = True
+
         x_pix = piece.x_position_index * 50
         y_pix = (7 - piece.y_position_index) * 50
         chessscreen.blit(piece.image, (x_pix, y_pix))
+
+
+"""def castling_gui(move):
+    start_rank = chess.square_rank(move.from_square)
+    if chess.square_file(move.to_square) == 6:
+        rook_start_file = 7
+        rook_end_file = 5 
+
+    elif chess.square_file(move.to_square) == 2:
+        rook_start_file = 0
+        rook_end_file = 3
+    else:
+        return
+    
+    rook_piece = board[start_rank][rook_start_file]
+    if rook_piece:
+        board[start_rank][rook_end_file] = rook_piece
+        board[start_rank][rook_start_file] = None
+        rook_piece.x_position_index = rook_end_file
+        rook_piece.y_position_index = start_rank
+        x_pix = rook_end_file * 50
+        y_pix = (7 - start_rank) * 50
+        chessscreen.blit(rook_piece.image, (x_pix, y_pix))
+
+        initial_draw_pieces()
+"""
+
 
 
 # Board Setup
@@ -338,7 +452,8 @@ while running and not chessboard.is_game_over():
                     end_x, end_y = get_mouse_position()
                     if move_piece(start_square, end_x, end_y):
                         last_move = chessboard.peek()
-                        update_drawing_piece(last_move.from_square, last_move.to_square)
+                        
+                        update_drawing_piece(last_move.from_square, last_move.to_square, chessboard)
             
                         print(board)
                     x_index = None

@@ -35,9 +35,22 @@ def move_piece(start_square, end_x, end_y):
     end_square = chess.square(end_x, end_y)
     move = chess.Move(start_square, end_square)
 
+    back_end_piece = chessboard.piece_at(start_square)
+    if back_end_piece is None:
+        return False
+    
+    if back_end_piece.piece_type == chess.PAWN:
+        if (back_end_piece.color == chess.WHITE and chess.square_rank(end_square) == 7) or \
+            (back_end_piece.color == chess.BLACK and chess.square_rank(end_square) == 0):
+            print("Pawn Promotion")
+            move = chess.Move(start_square, end_square, promotion = chess.QUEEN)
+
+
     if move in chessboard.legal_moves:
         chessboard.push(move)
-        return end_square 
+        
+
+        return end_square
     return False
 
 
