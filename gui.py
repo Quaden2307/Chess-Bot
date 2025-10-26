@@ -316,33 +316,6 @@ def update_drawing_piece(start_square, end_square, chessboard):
         chessscreen.blit(piece.image, (x_pix, y_pix))
 
 
-"""def castling_gui(move):
-    start_rank = chess.square_rank(move.from_square)
-    if chess.square_file(move.to_square) == 6:
-        rook_start_file = 7
-        rook_end_file = 5 
-
-    elif chess.square_file(move.to_square) == 2:
-        rook_start_file = 0
-        rook_end_file = 3
-    else:
-        return
-    
-    rook_piece = board[start_rank][rook_start_file]
-    if rook_piece:
-        board[start_rank][rook_end_file] = rook_piece
-        board[start_rank][rook_start_file] = None
-        rook_piece.x_position_index = rook_end_file
-        rook_piece.y_position_index = start_rank
-        x_pix = rook_end_file * 50
-        y_pix = (7 - start_rank) * 50
-        chessscreen.blit(rook_piece.image, (x_pix, y_pix))
-
-        initial_draw_pieces()
-"""
-
-
-
 # Board Setup
 board_size = 8
 
