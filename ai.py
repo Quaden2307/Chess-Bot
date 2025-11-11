@@ -38,19 +38,19 @@ class ChessNet(nn.Module):
 
 # ========== DATA GENERATION ==========
 
-def generate_data(num_positions=500):
+def generate_data(num_positions=1000):
     engine = chess.engine.SimpleEngine.popen_uci("/opt/homebrew/bin/stockfish")
     X, y = [], []
 
     for _ in tqdm(range(num_positions)):
         board = chess.Board()
-        for _ in range(np.random.randint(0, 40)):
+        for _ in range(np.random.randint(0, 80)):
             if board.is_game_over():
                 break
             move = np.random.choice(list(board.legal_moves))
             board.push(move)
 
-        info = engine.analyse(board, chess.engine.Limit(depth=10))
+        info = engine.analyse(board, chess.engine.Limit(depth=15))
         score = info["score"].white().score(mate_score=1000)
         if score is None:
             continue
@@ -64,7 +64,7 @@ def generate_data(num_positions=500):
 
 # ========== TRAINING ==========
 
-def train(model, X, y, epochs=10, lr=1e-3, batch_size=32):
+def train(model, X, y, epochs=20, lr=1e-3, batch_size=32): # Train model with higher epochs for better performance (may slow down execution)
     dataset = torch.utils.data.TensorDataset(X, y)
     loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -98,11 +98,11 @@ def choose_best_move(model, board):
 
     return best_move, best_value
 
-# ========== MAIN EXECUTION ==========
+# ========== MAIN ==========
 
 if __name__ == "__main__":
-    # Step 1: Train (or skip if already trained)
-    train_new_model = True  # change to False if you already have chess_model.pth
+    # Train (or skip if already trained)
+    train_new_model = True  # change to False if already have chess_model.pth
 
     if train_new_model:
         print("Generating training data...")
@@ -115,6 +115,8 @@ if __name__ == "__main__":
 
         torch.save(model.state_dict(), "chess_model.pth")
         print("Model saved as 'chess_model.pth'")
+        
+    # Skip Training Process
     else:
         model = ChessNet()
         model.load_state_dict(torch.load("chess_model.pth"))
@@ -129,7 +131,7 @@ if __name__ == "__main__":
         move, value = choose_best_move(model, board)
         board.push(move)
         print(board)
-        time.sleep(2)  # pause for readability
+        time.sleep(2)  # pause for readability --> Must implement board visualization on gui
         print("Predicted eval:", round(value, 3))
         print("-" * 40)
 

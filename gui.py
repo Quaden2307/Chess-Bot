@@ -3,7 +3,6 @@ import os
 from game import chessboard, get_mouse_position, get_starting_piece_position, move_piece
 import chess
 
-
 os.chdir(os.path.dirname(__file__))
 
 pygame.init()
