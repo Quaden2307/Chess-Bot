@@ -38,7 +38,7 @@ class ChessNet(nn.Module):
 
 # ========== DATA GENERATION ==========
 
-def generate_data(num_positions=1000):
+def generate_data(num_positions=1000): # -> increased num_positions for better training; may slow down execution
     engine = chess.engine.SimpleEngine.popen_uci("/opt/homebrew/bin/stockfish")
     X, y = [], []
 
@@ -115,7 +115,7 @@ if __name__ == "__main__":
 
         torch.save(model.state_dict(), "chess_model.pth")
         print("Model saved as 'chess_model.pth'")
-        
+
     # Skip Training Process
     else:
         model = ChessNet()
@@ -136,3 +136,11 @@ if __name__ == "__main__":
         print("-" * 40)
 
     print("Game Over! Result:", board.result())
+
+
+#Key Notes:
+
+#Current model almost always ends in self-playing eval of 0.900 < eval < 1 
+#Always advantages for white
+#Aiming to implement openings for more variance in advantage
+#More training data and higher epochs also cause games to be much longer
