@@ -90,7 +90,7 @@ function App() {
     } catch (error) {
       console.error('Error fetching evaluation:', error);
     }
-  }, []);
+  }, [API_URL]);
 
   // Fetch suggested moves
   const fetchSuggestedMoves = useCallback(async (fen: string) => {
@@ -115,7 +115,7 @@ function App() {
     } catch (error) {
       console.error('Error fetching suggested moves:', error);
     }
-  }, [showArrows]);
+  }, [API_URL, showArrows]);
 
   // Update evaluation and suggestions when position changes
   useEffect(() => {
@@ -165,7 +165,7 @@ function App() {
     } finally {
       setIsAiThinking(false);
     }
-  }, [isAiThinking]);
+  }, [API_URL, isAiThinking]);
 
   // Check if it's AI's turn in PvA mode
   useEffect(() => {
