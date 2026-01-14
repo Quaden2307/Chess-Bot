@@ -9,6 +9,9 @@ ENV/
 env/
 *.log
 
+# But keep api directory
+!api/
+
 # Model files (too large for git)
 *.pth
 

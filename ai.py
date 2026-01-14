@@ -64,7 +64,7 @@ def generate_data(num_positions=1000): # -> increased num_positions for better t
 
 # ========== TRAINING ==========
 
-def train(model, X, y, epochs=20, lr=1e-3, batch_size=32): # Train model with higher epochs for better performance (may slow down execution)
+def train(model, X, y, epochs=30, lr=1e-3, batch_size=32): # Train model with higher epochs for better performance (may slow down execution)
     dataset = torch.utils.data.TensorDataset(X, y)
     loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -106,7 +106,7 @@ if __name__ == "__main__":
 
     if train_new_model:
         print("Generating training data...")
-        X, y = generate_data(num_positions=200)  # smaller number for faster run
+        X, y = generate_data(num_positions=100)  # smaller number for faster run
         print(f"Data ready: {X.shape}, {y.shape}")
 
         model = ChessNet()
