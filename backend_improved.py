@@ -119,25 +119,19 @@ def board_to_advanced_tensor(board: chess.Board):
     ext_center_control = (white_ext_center - black_ext_center) / 12.0
     features.append(ext_center_control)
 
-    # 6. King safety
+    # 6. King safety (simplified for speed)
     white_king_sq = board.king(chess.WHITE)
     black_king_sq = board.king(chess.BLACK)
 
-    # Count pieces defending the king
-    white_king_defenders = 0
-    black_king_defenders = 0
-    if white_king_sq:
-        for sq in chess.SQUARES:
-            if board.piece_at(sq) and board.piece_at(sq).color == chess.WHITE:
-                if chess.square_distance(sq, white_king_sq) <= 2:
-                    white_king_defenders += 1
-    if black_king_sq:
-        for sq in chess.SQUARES:
-            if board.piece_at(sq) and board.piece_at(sq).color == chess.BLACK:
-                if chess.square_distance(sq, black_king_sq) <= 2:
-                    black_king_defenders += 1
+    # Simple king safety: count attackers near king
+    white_king_safety = 0
+    black_king_safety = 0
+    if white_king_sq is not None:
+        white_king_safety = len(board.attackers(chess.WHITE, white_king_sq))
+    if black_king_sq is not None:
+        black_king_safety = len(board.attackers(chess.BLACK, black_king_sq))
 
-    king_safety = (white_king_defenders - black_king_defenders) / 10.0
+    king_safety = (white_king_safety - black_king_safety) / 10.0
     features.append(king_safety)
 
     # 7. Castling rights
@@ -163,13 +157,19 @@ def board_to_advanced_tensor(board: chess.Board):
     attack_pressure = (white_attacks - black_attacks) / 20.0
     features.append(attack_pressure)
 
-    # 10. Pawn structure
-    white_pawns = [sq for sq in chess.SQUARES if board.piece_at(sq) == chess.Piece(chess.PAWN, chess.WHITE)]
-    black_pawns = [sq for sq in chess.SQUARES if board.piece_at(sq) == chess.Piece(chess.PAWN, chess.BLACK)]
+    # 10. Pawn structure (optimized)
+    white_pawn_files = []
+    black_pawn_files = []
+    for sq, piece in board.piece_map().items():
+        if piece.piece_type == chess.PAWN:
+            if piece.color == chess.WHITE:
+                white_pawn_files.append(chess.square_file(sq))
+            else:
+                black_pawn_files.append(chess.square_file(sq))
 
     # Doubled pawns
-    white_doubled = sum(1 for file in range(8) if sum(1 for sq in white_pawns if chess.square_file(sq) == file) > 1)
-    black_doubled = sum(1 for file in range(8) if sum(1 for sq in black_pawns if chess.square_file(sq) == file) > 1)
+    white_doubled = sum(1 for f in range(8) if white_pawn_files.count(f) > 1)
+    black_doubled = sum(1 for f in range(8) if black_pawn_files.count(f) > 1)
     doubled_pawns = (black_doubled - white_doubled) / 8.0
     features.append(doubled_pawns)
 
