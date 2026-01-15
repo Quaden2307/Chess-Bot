@@ -26,167 +26,217 @@ PIECE_VALUES = {
     chess.KING: 20000
 }
 
-def board_to_enhanced_tensor(board: chess.Board):
-    """Enhanced board representation with tactical features"""
-    # Basic piece positions (12 channels, 8x8)
+# Piece-square tables for positional evaluation
+PAWN_TABLE = [
+    0,  0,  0,  0,  0,  0,  0,  0,
+    50, 50, 50, 50, 50, 50, 50, 50,
+    10, 10, 20, 30, 30, 20, 10, 10,
+    5,  5, 10, 25, 25, 10,  5,  5,
+    0,  0,  0, 20, 20,  0,  0,  0,
+    5, -5,-10,  0,  0,-10, -5,  5,
+    5, 10, 10,-20,-20, 10, 10,  5,
+    0,  0,  0,  0,  0,  0,  0,  0
+]
+
+KNIGHT_TABLE = [
+    -50,-40,-30,-30,-30,-30,-40,-50,
+    -40,-20,  0,  0,  0,  0,-20,-40,
+    -30,  0, 10, 15, 15, 10,  0,-30,
+    -30,  5, 15, 20, 20, 15,  5,-30,
+    -30,  0, 15, 20, 20, 15,  0,-30,
+    -30,  5, 10, 15, 15, 10,  5,-30,
+    -40,-20,  0,  5,  5,  0,-20,-40,
+    -50,-40,-30,-30,-30,-30,-40,-50
+]
+
+def board_to_advanced_tensor(board: chess.Board):
+    """Advanced board encoding with tactical and positional features"""
+    features = []
+
+    # 1. Piece positions (12 channels * 64 squares = 768 features)
     piece_tensor = np.zeros((8, 8, 12), dtype=np.float32)
     for square, piece in board.piece_map().items():
         x = chess.square_file(square)
         y = chess.square_rank(square)
         piece_tensor[y, x, PIECE_INDEX[piece.symbol()]] = 1.0
+    features.extend(piece_tensor.flatten().tolist())
 
-    # Flatten piece positions
-    features = piece_tensor.flatten().tolist()
-
-    # Material count (normalized)
+    # 2. Material evaluation
     white_material = sum(PIECE_VALUES[p.piece_type] for p in board.piece_map().values() if p.color == chess.WHITE)
     black_material = sum(PIECE_VALUES[p.piece_type] for p in board.piece_map().values() if p.color == chess.BLACK)
     material_advantage = (white_material - black_material) / 10000.0
     features.append(material_advantage)
 
-    # Mobility (number of legal moves)
-    white_mobility = len(list(board.legal_moves)) if board.turn == chess.WHITE else 0
-    black_mobility = len(list(board.legal_moves)) if board.turn == chess.BLACK else 0
-    board.push(chess.Move.null())  # Switch turn temporarily
-    if board.turn == chess.BLACK:
-        black_mobility = len(list(board.legal_moves))
-    else:
+    # 3. Piece-square tables evaluation (positional value)
+    white_pos_value = 0
+    black_pos_value = 0
+    for square, piece in board.piece_map().items():
+        if piece.piece_type == chess.PAWN:
+            if piece.color == chess.WHITE:
+                white_pos_value += PAWN_TABLE[square]
+            else:
+                black_pos_value += PAWN_TABLE[63 - square]
+        elif piece.piece_type == chess.KNIGHT:
+            if piece.color == chess.WHITE:
+                white_pos_value += KNIGHT_TABLE[square]
+            else:
+                black_pos_value += KNIGHT_TABLE[63 - square]
+    positional_advantage = (white_pos_value - black_pos_value) / 1000.0
+    features.append(positional_advantage)
+
+    # 4. Mobility (how many moves each side has)
+    current_turn = board.turn
+    white_mobility = 0
+    black_mobility = 0
+
+    if board.turn == chess.WHITE:
         white_mobility = len(list(board.legal_moves))
-    board.pop()
-    mobility_diff = (white_mobility - black_mobility) / 50.0
-    features.append(mobility_diff)
-
-    # King safety - distance from center and pawn shield
-    white_king_square = board.king(chess.WHITE)
-    black_king_square = board.king(chess.BLACK)
-
-    if white_king_square is not None:
-        wk_file = chess.square_file(white_king_square)
-        wk_rank = chess.square_rank(white_king_square)
-        white_king_center_dist = abs(wk_file - 3.5) + abs(wk_rank - 3.5)
-
-        # Count pawns in front of white king
-        white_pawn_shield = 0
-        for file_offset in [-1, 0, 1]:
-            f = wk_file + file_offset
-            if 0 <= f < 8:
-                for rank in range(wk_rank + 1, 8):
-                    sq = chess.square(f, rank)
-                    piece = board.piece_at(sq)
-                    if piece and piece.piece_type == chess.PAWN and piece.color == chess.WHITE:
-                        white_pawn_shield += 1
-                        break
+        board.turn = chess.BLACK
+        black_mobility = len(list(board.legal_moves))
+        board.turn = chess.WHITE
     else:
-        white_king_center_dist = 0
-        white_pawn_shield = 0
+        black_mobility = len(list(board.legal_moves))
+        board.turn = chess.WHITE
+        white_mobility = len(list(board.legal_moves))
+        board.turn = chess.BLACK
 
-    if black_king_square is not None:
-        bk_file = chess.square_file(black_king_square)
-        bk_rank = chess.square_rank(black_king_square)
-        black_king_center_dist = abs(bk_file - 3.5) + abs(bk_rank - 3.5)
+    mobility_advantage = (white_mobility - black_mobility) / 50.0
+    features.append(mobility_advantage)
 
-        # Count pawns in front of black king
-        black_pawn_shield = 0
-        for file_offset in [-1, 0, 1]:
-            f = bk_file + file_offset
-            if 0 <= f < 8:
-                for rank in range(0, bk_rank):
-                    sq = chess.square(f, rank)
-                    piece = board.piece_at(sq)
-                    if piece and piece.piece_type == chess.PAWN and piece.color == chess.BLACK:
-                        black_pawn_shield += 1
-                        break
-    else:
-        black_king_center_dist = 0
-        black_pawn_shield = 0
+    # 5. Center control (pieces in center squares)
+    center_squares = [chess.E4, chess.D4, chess.E5, chess.D5]
+    extended_center = [chess.C3, chess.D3, chess.E3, chess.F3,
+                       chess.C4, chess.F4, chess.C5, chess.F5,
+                       chess.C6, chess.D6, chess.E6, chess.F6]
 
-    features.append((white_pawn_shield - black_pawn_shield) / 3.0)
-    features.append((black_king_center_dist - white_king_center_dist) / 10.0)
+    white_center = sum(1 for sq in center_squares if board.piece_at(sq) and board.piece_at(sq).color == chess.WHITE)
+    black_center = sum(1 for sq in center_squares if board.piece_at(sq) and board.piece_at(sq).color == chess.BLACK)
+    center_control = (white_center - black_center) / 4.0
+    features.append(center_control)
 
-    # Castling rights
-    features.append(1.0 if board.has_kingside_castling_rights(chess.WHITE) else 0.0)
-    features.append(1.0 if board.has_queenside_castling_rights(chess.WHITE) else 0.0)
-    features.append(1.0 if board.has_kingside_castling_rights(chess.BLACK) else 0.0)
-    features.append(1.0 if board.has_queenside_castling_rights(chess.BLACK) else 0.0)
+    white_ext_center = sum(1 for sq in extended_center if board.piece_at(sq) and board.piece_at(sq).color == chess.WHITE)
+    black_ext_center = sum(1 for sq in extended_center if board.piece_at(sq) and board.piece_at(sq).color == chess.BLACK)
+    ext_center_control = (white_ext_center - black_ext_center) / 12.0
+    features.append(ext_center_control)
 
-    # Check status
-    features.append(1.0 if board.is_check() else 0.0)
+    # 6. King safety
+    white_king_sq = board.king(chess.WHITE)
+    black_king_sq = board.king(chess.BLACK)
 
-    # Turn to move
-    features.append(1.0 if board.turn == chess.WHITE else -1.0)
+    # Count pieces defending the king
+    white_king_defenders = 0
+    black_king_defenders = 0
+    if white_king_sq:
+        for sq in chess.SQUARES:
+            if board.piece_at(sq) and board.piece_at(sq).color == chess.WHITE:
+                if chess.square_distance(sq, white_king_sq) <= 2:
+                    white_king_defenders += 1
+    if black_king_sq:
+        for sq in chess.SQUARES:
+            if board.piece_at(sq) and board.piece_at(sq).color == chess.BLACK:
+                if chess.square_distance(sq, black_king_sq) <= 2:
+                    black_king_defenders += 1
 
-    # Center control (count pieces attacking center squares)
-    center_squares = [chess.E4, chess.E5, chess.D4, chess.D5]
-    white_center_control = 0
-    black_center_control = 0
-    for sq in center_squares:
-        white_center_control += len(board.attackers(chess.WHITE, sq))
-        black_center_control += len(board.attackers(chess.BLACK, sq))
-    features.append((white_center_control - black_center_control) / 10.0)
+    king_safety = (white_king_defenders - black_king_defenders) / 10.0
+    features.append(king_safety)
 
-    # Pawn structure - doubled pawns
-    white_pawn_files = [chess.square_file(sq) for sq, p in board.piece_map().items()
-                        if p.piece_type == chess.PAWN and p.color == chess.WHITE]
-    black_pawn_files = [chess.square_file(sq) for sq, p in board.piece_map().items()
-                        if p.piece_type == chess.PAWN and p.color == chess.BLACK]
+    # 7. Castling rights
+    white_can_castle_kingside = board.has_kingside_castling_rights(chess.WHITE)
+    white_can_castle_queenside = board.has_queenside_castling_rights(chess.WHITE)
+    black_can_castle_kingside = board.has_kingside_castling_rights(chess.BLACK)
+    black_can_castle_queenside = board.has_queenside_castling_rights(chess.BLACK)
 
-    white_doubled = sum(1 for f in range(8) if white_pawn_files.count(f) > 1)
-    black_doubled = sum(1 for f in range(8) if black_pawn_files.count(f) > 1)
-    features.append((black_doubled - white_doubled) / 8.0)
+    features.extend([
+        1.0 if white_can_castle_kingside else 0.0,
+        1.0 if white_can_castle_queenside else 0.0,
+        1.0 if black_can_castle_kingside else 0.0,
+        1.0 if black_can_castle_queenside else 0.0
+    ])
 
+    # 8. Check status
+    in_check = 1.0 if board.is_check() else 0.0
+    features.append(in_check)
+
+    # 9. Attacked squares (tactical awareness)
+    white_attacks = len(board.attacks(white_king_sq)) if white_king_sq else 0
+    black_attacks = len(board.attacks(black_king_sq)) if black_king_sq else 0
+    attack_pressure = (white_attacks - black_attacks) / 20.0
+    features.append(attack_pressure)
+
+    # 10. Pawn structure
+    white_pawns = [sq for sq in chess.SQUARES if board.piece_at(sq) == chess.Piece(chess.PAWN, chess.WHITE)]
+    black_pawns = [sq for sq in chess.SQUARES if board.piece_at(sq) == chess.Piece(chess.PAWN, chess.BLACK)]
+
+    # Doubled pawns
+    white_doubled = sum(1 for file in range(8) if sum(1 for sq in white_pawns if chess.square_file(sq) == file) > 1)
+    black_doubled = sum(1 for file in range(8) if sum(1 for sq in black_pawns if chess.square_file(sq) == file) > 1)
+    doubled_pawns = (black_doubled - white_doubled) / 8.0
+    features.append(doubled_pawns)
+
+    # 11. Game phase (endgame indicator)
+    total_material = white_material + black_material
+    game_phase = 1.0 - (total_material / 78000.0)  # 0 = opening, 1 = endgame
+    features.append(game_phase)
+
+    # 12. Turn indicator
+    turn = 1.0 if board.turn == chess.WHITE else -1.0
+    features.append(turn)
+
+    # Count features:
+    # 768 (piece positions) + 1 (material) + 1 (positional) + 1 (mobility) + 2 (center control)
+    # + 1 (king safety) + 4 (castling) + 1 (check) + 1 (attacks) + 1 (pawn structure)
+    # + 1 (game phase) + 1 (turn) = 783 features
     return torch.tensor(features, dtype=torch.float32)
 
 # ========== MODEL ==========
 
-class ImprovedChessNet(nn.Module):
-    def __init__(self):
+class AdvancedChessNet(nn.Module):
+    def __init__(self, input_size=783):
         super().__init__()
-        input_size = 768 + 12  # 768 from piece positions + 12 features
 
-        self.fc1 = nn.Linear(input_size, 512)
-        self.bn1 = nn.BatchNorm1d(512)
+        # Deeper network with residual connections
+        self.fc1 = nn.Linear(input_size, 1024)
+        self.bn1 = nn.BatchNorm1d(1024)
         self.dropout1 = nn.Dropout(0.3)
 
-        self.fc2 = nn.Linear(512, 256)
-        self.bn2 = nn.BatchNorm1d(256)
+        self.fc2 = nn.Linear(1024, 512)
+        self.bn2 = nn.BatchNorm1d(512)
         self.dropout2 = nn.Dropout(0.3)
 
-        self.fc3 = nn.Linear(256, 128)
-        self.bn3 = nn.BatchNorm1d(128)
+        self.fc3 = nn.Linear(512, 256)
+        self.bn3 = nn.BatchNorm1d(256)
         self.dropout3 = nn.Dropout(0.2)
 
-        self.fc4 = nn.Linear(128, 64)
-        self.fc5 = nn.Linear(64, 1)
+        self.fc4 = nn.Linear(256, 128)
+        self.bn4 = nn.BatchNorm1d(128)
+        self.dropout4 = nn.Dropout(0.2)
+
+        self.fc5 = nn.Linear(128, 64)
+        self.fc6 = nn.Linear(64, 1)
 
     def forward(self, x):
-        x = F.relu(self.bn1(self.fc1(x)))
-        x = self.dropout1(x)
-
-        x = F.relu(self.bn2(self.fc2(x)))
-        x = self.dropout2(x)
-
-        x = F.relu(self.bn3(self.fc3(x)))
-        x = self.dropout3(x)
-
-        x = F.relu(self.fc4(x))
-        x = torch.tanh(self.fc5(x))
-
+        x = self.dropout1(F.relu(self.bn1(self.fc1(x))))
+        x = self.dropout2(F.relu(self.bn2(self.fc2(x))))
+        x = self.dropout3(F.relu(self.bn3(self.fc3(x))))
+        x = self.dropout4(F.relu(self.bn4(self.fc4(x))))
+        x = F.relu(self.fc5(x))
+        x = torch.tanh(self.fc6(x))
         return x
 
 # Load the trained model
-model = ImprovedChessNet()
+model = AdvancedChessNet(input_size=783)
 try:
     # Try to load improved model first
     model.load_state_dict(torch.load("chess_model_improved.pth", map_location=torch.device('cpu')))
     model.eval()
-    print("Improved model loaded successfully!")
+    print("Advanced model loaded successfully!")
 except FileNotFoundError:
     try:
         model.load_state_dict(torch.load("chess_model_best.pth", map_location=torch.device('cpu')))
         model.eval()
         print("Best model loaded successfully!")
     except FileNotFoundError:
-        print("Warning: No trained model found. Please run improved_chess_ai.py first.")
+        print("Warning: No trained model found. Please run train_advanced_model.py first.")
 
 # ========== MOVE SELECTION ==========
 
@@ -242,7 +292,7 @@ def evaluate_position(board):
             return 10.0 if mate_in > 0 else -10.0
 
         with torch.no_grad():
-            x = board_to_enhanced_tensor(board).unsqueeze(0)  # Add batch dimension
+            x = board_to_advanced_tensor(board).unsqueeze(0)  # Add batch dimension
             value = model(x).item()
         return value
     except Exception as e:
