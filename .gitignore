@@ -12,8 +12,10 @@ env/
 # But keep api directory
 !api/
 
-# Model files (too large for git)
-*.pth
+# Model files (allow improved model for deployment)
+chess_model.pth
+# Keep improved model
+# *.pth
 
 # Node
 node_modules/
