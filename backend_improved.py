@@ -195,38 +195,42 @@ def detect_mate_in_n(board, max_depth=5):
     Detect if there's a forced mate within max_depth moves.
     Returns integer: positive for white advantage, negative for black advantage, or None
     """
-    # Check for immediate checkmate
-    if board.is_checkmate():
-        # The side to move is checkmated, so opponent wins
-        # If white is in checkmate, return negative (black wins)
-        # If black is in checkmate, return positive (white wins)
-        return -1 if board.turn == chess.WHITE else 1
-
-    # Simple mate detection: check if any move leads to checkmate
-    for move in board.legal_moves:
-        board.push(move)
+    try:
+        # Check for immediate checkmate
         if board.is_checkmate():
-            # Found checkmate in 1
-            board.pop()
-            return 1 if board.turn == chess.WHITE else -1
-        board.pop()
+            # The side to move is checkmated, so opponent wins
+            # If white is in checkmate, return negative (black wins)
+            # If black is in checkmate, return positive (white wins)
+            return -1 if board.turn == chess.WHITE else 1
 
-    # For deeper search, only check 2-3 moves ahead due to performance
-    if max_depth >= 2:
+        # Simple mate detection: check if any move leads to checkmate
         for move in board.legal_moves:
             board.push(move)
-            # After opponent's move, can we checkmate?
-            for move2 in board.legal_moves:
-                board.push(move2)
-                if board.is_checkmate():
-                    # Found mate in 2
-                    board.pop()
-                    board.pop()
-                    return 2 if board.turn == chess.WHITE else -2
+            if board.is_checkmate():
+                # Found checkmate in 1
                 board.pop()
+                return 1 if board.turn == chess.WHITE else -1
             board.pop()
 
-    return None
+        # For deeper search, only check 2-3 moves ahead due to performance
+        if max_depth >= 2:
+            for move in board.legal_moves:
+                board.push(move)
+                # After opponent's move, can we checkmate?
+                for move2 in board.legal_moves:
+                    board.push(move2)
+                    if board.is_checkmate():
+                        # Found mate in 2
+                        board.pop()
+                        board.pop()
+                        return 2 if board.turn == chess.WHITE else -2
+                    board.pop()
+                board.pop()
+
+        return None
+    except Exception as e:
+        print(f"Error in detect_mate_in_n: {e}")
+        return None
 
 def evaluate_position(board):
     """Evaluate the current position"""
@@ -248,29 +252,42 @@ def evaluate_position(board):
 
 def get_best_moves(board, top_n=3):
     """Get the top N best moves with their evaluations"""
-    moves_with_scores = []
+    try:
+        moves_with_scores = []
 
-    for move in board.legal_moves:
-        board.push(move)
-        # Negate score because we're evaluating from opponent's perspective
-        score = -evaluate_position(board)
-        board.pop()
-        moves_with_scores.append({
-            'move': move.uci(),
-            'score': score,
-            'san': board.san(move)
-        })
+        for move in board.legal_moves:
+            try:
+                board.push(move)
+                # Negate score because we're evaluating from opponent's perspective
+                score = -evaluate_position(board)
+                board.pop()
+                moves_with_scores.append({
+                    'move': move.uci(),
+                    'score': score,
+                    'san': board.san(move)
+                })
+            except Exception as e:
+                print(f"Error evaluating move {move}: {e}")
+                board.pop()  # Make sure we pop even on error
+                continue
 
-    # Sort by score descending
-    moves_with_scores.sort(key=lambda x: x['score'], reverse=True)
-    return moves_with_scores[:top_n]
+        # Sort by score descending
+        moves_with_scores.sort(key=lambda x: x['score'], reverse=True)
+        return moves_with_scores[:top_n]
+    except Exception as e:
+        print(f"Error in get_best_moves: {e}")
+        return []
 
 def choose_best_move(board):
     """Choose the best move with some positional understanding"""
-    best_moves = get_best_moves(board, top_n=1)
-    if best_moves:
-        return best_moves[0]
-    return None
+    try:
+        best_moves = get_best_moves(board, top_n=1)
+        if best_moves:
+            return best_moves[0]
+        return None
+    except Exception as e:
+        print(f"Error in choose_best_move: {e}")
+        return None
 
 # ========== API ENDPOINTS ==========
 
