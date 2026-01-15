@@ -26,7 +26,10 @@ function App() {
   const [gameHistory, setGameHistory] = useState<string[]>([]); // Store all FEN positions
   const [capturedPieces, setCapturedPieces] = useState<{ white: string[], black: string[] }>({ white: [], black: [] });
 
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+  // Use relative URL in production (same domain), localhost in development
+  const API_URL = process.env.REACT_APP_API_URL || (
+    process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5001/api'
+  );
 
   // Calculate captured pieces
   const calculateCapturedPieces = useCallback((currentGame: Chess) => {

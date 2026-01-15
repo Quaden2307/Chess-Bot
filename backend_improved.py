@@ -1,12 +1,13 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import torch
 import chess
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
+import os
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='chess-frontend/build', static_url_path='')
 CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
 # ========== ENCODING ==========
@@ -394,7 +395,25 @@ def make_ai_move():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# ========== FRONTEND ROUTES (for Docker deployment) ==========
+
+@app.route('/')
+def serve_frontend():
+    """Serve the React frontend"""
+    return send_from_directory(app.static_folder, 'index.html')
+
+@app.route('/<path:path>')
+def serve_static(path):
+    """Serve static files or frontend for any route"""
+    file_path = os.path.join(app.static_folder, path)
+    if os.path.exists(file_path):
+        return send_from_directory(app.static_folder, path)
+    else:
+        # For React Router - serve index.html for all non-file routes
+        return send_from_directory(app.static_folder, 'index.html')
+
 if __name__ == '__main__':
     print("Starting Improved Chess AI Backend Server...")
-    print("Server running on http://localhost:5001")
-    app.run(host='0.0.0.0', debug=True, port=5001)
+    port = int(os.environ.get('PORT', 5001))
+    print(f"Server running on http://0.0.0.0:{port}")
+    app.run(host='0.0.0.0', debug=False, port=port)
