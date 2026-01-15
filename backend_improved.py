@@ -294,7 +294,35 @@ def choose_best_move(board):
 @app.route('/api/health', methods=['GET'])
 def health():
     """Health check endpoint"""
-    return jsonify({'status': 'healthy'})
+    import sys
+    return jsonify({
+        'status': 'healthy',
+        'model_loaded': model is not None,
+        'python_version': sys.version
+    })
+
+@app.route('/api/test-move', methods=['GET'])
+def test_move():
+    """Test endpoint to verify move generation works"""
+    try:
+        import random
+        import traceback
+        board = chess.Board()
+        legal_moves = list(board.legal_moves)
+        move = random.choice(legal_moves)
+        return jsonify({
+            'status': 'success',
+            'move': move.uci(),
+            'san': board.san(move),
+            'legal_moves_count': len(legal_moves)
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 
 @app.route('/api/evaluate', methods=['POST'])
 def evaluate():
