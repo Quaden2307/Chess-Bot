@@ -230,16 +230,21 @@ def detect_mate_in_n(board, max_depth=5):
 
 def evaluate_position(board):
     """Evaluate the current position"""
-    # Check for mate first
-    mate_in = detect_mate_in_n(board, max_depth=5)
-    if mate_in is not None:
-        # Return a large value for mate positions
-        return 10.0 if mate_in > 0 else -10.0
+    try:
+        # Check for mate first
+        mate_in = detect_mate_in_n(board, max_depth=5)
+        if mate_in is not None:
+            # Return a large value for mate positions
+            return 10.0 if mate_in > 0 else -10.0
 
-    with torch.no_grad():
-        x = board_to_enhanced_tensor(board).unsqueeze(0)  # Add batch dimension
-        value = model(x).item()
-    return value
+        with torch.no_grad():
+            x = board_to_enhanced_tensor(board).unsqueeze(0)  # Add batch dimension
+            value = model(x).item()
+        return value
+    except Exception as e:
+        print(f"Error evaluating position: {e}")
+        # Return 0 (equal position) if evaluation fails
+        return 0.0
 
 def get_best_moves(board, top_n=3):
     """Get the top N best moves with their evaluations"""
@@ -375,10 +380,34 @@ def make_ai_move():
                 'result': board.result()
             }), 400
 
-        move_data = choose_best_move(board)
-
-        if not move_data:
-            return jsonify({'error': 'No legal moves available'}), 400
+        # Try to get best move, fallback to random if fails
+        try:
+            move_data = choose_best_move(board)
+            if not move_data:
+                # Fallback to random move
+                import random
+                legal_moves = list(board.legal_moves)
+                if not legal_moves:
+                    return jsonify({'error': 'No legal moves available'}), 400
+                move = random.choice(legal_moves)
+                move_data = {
+                    'move': move.uci(),
+                    'san': board.san(move),
+                    'score': 0.0
+                }
+        except Exception as model_error:
+            # If model fails, use random move
+            print(f"Model error: {model_error}, using random move")
+            import random
+            legal_moves = list(board.legal_moves)
+            if not legal_moves:
+                return jsonify({'error': 'No legal moves available'}), 400
+            move = random.choice(legal_moves)
+            move_data = {
+                'move': move.uci(),
+                'san': board.san(move),
+                'score': 0.0
+            }
 
         # Apply the move
         move = chess.Move.from_uci(move_data['move'])
@@ -393,6 +422,9 @@ def make_ai_move():
             'result': board.result() if board.is_game_over() else None
         })
     except Exception as e:
+        print(f"Error in make_ai_move: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 # ========== FRONTEND ROUTES (for Docker deployment) ==========
