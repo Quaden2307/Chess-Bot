@@ -29,6 +29,10 @@ COPY backend_improved.py .
 COPY improved_chess_ai.py .
 COPY api/ ./api/
 
+# Copy model files
+COPY chess_model_improved.pth .
+COPY chess_model_best.pth .
+
 # Copy built frontend from stage 1
 COPY --from=frontend-build /app/frontend/build ./chess-frontend/build
 
